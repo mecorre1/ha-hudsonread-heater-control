@@ -18,4 +18,4 @@ RUN pip install asyncio
 ENTRYPOINT ["/bin/bash"] # or ["bash"]
 
 # Define a command to run your script as CMD (optional)
-CMD ["python", "scan_bluetooth.py"]
+CMD ["python", "control_heater.py"]
