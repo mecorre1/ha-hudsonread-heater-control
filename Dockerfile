@@ -10,6 +10,7 @@ COPY . .
 # Install required libraries
 RUN pip install --upgrade pip
 RUN pip install bleak
+RUN pip install asyncio
 
 # Define the command to run your script when the container starts
-CMD ["python", "control_heater.py"]
+CMD ["python", "scan_bluetooth.py"]
