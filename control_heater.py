@@ -72,9 +72,20 @@ def celsius_to_bytes(temp):
     return value.to_bytes(2, byteorder="big") + value.to_bytes(2, byteorder="big")
 
 async def main():
+# 2024-12-26T21:03:06.291629861Z Found device: Terma Wireless, Address: CC:22:37:11:30:EC
+# 2024-12-26T21:03:06.291661582Z Found device: Terma Wireless, Address: CC:22:37:11:5D:02
+# 2024-12-26T21:03:06.291725433Z Found device: Terma Wireless, Address: CC:22:37:11:1E:84
+# 2024-12-26T21:03:06.291819395Z Found device: Terma Wireless, Address: CC:22:37:11:26:4F
+# 2024-12-26T21:03:06.291847246Z Found device: Terma Wireless, Address: CC:22:37:11:1E:40
+
+
+
     heaters = [
-        Heater("Heater 1", "XX:XX:XX:XX:XX:X1"),  # Replace with actual addresses
-        Heater("Heater 2", "XX:XX:XX:XX:XX:X2"),
+        Heater("Heater 1", "CC:22:37:11:30:EC"),  # Replace with actual addresses
+        Heater("Heater 2", "CC:22:37:11:5D:02"),  # Replace with actual addresses
+        Heater("Heater 3", "CC:22:37:11:1E:84"),  # Replace with actual addresses
+        Heater("Heater 4", "CC:22:37:11:26:4F"),  # Replace with actual addresses
+        Heater("Heater 5", "CC:22:37:11:1E:40"),  # Replace with actual addresses
         # Add more heaters here
     ]
 
