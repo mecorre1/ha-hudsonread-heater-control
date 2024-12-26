@@ -1,14 +1,13 @@
-import time
-import bluetooth
+from bleak import BleakScanner
+import asyncio
 
-def control_heater():
+async def scan_devices():
     print("Scanning for Bluetooth devices...")
-    devices = bluetooth.discover_devices(duration=5, lookup_names=True)
-
-    for addr, name in devices:
-        print(f"Found device {name} with address {addr}")
-
-    print("Heater control executed!")
+    devices = await BleakScanner.discover()
+    for device in devices:
+        print(f"Found device: {device.name}, Address: {device.address}")
+    print("Scan complete.")
 
 if __name__ == "__main__":
-    control_heater()
+    asyncio.run(scan_devices())
+
