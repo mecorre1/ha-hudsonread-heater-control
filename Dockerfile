@@ -1,4 +1,4 @@
-FROM arm64v8/python:3.11-slim-buster # Or correct base image for your pi
+FROM arm64v8/python:3.11-slim-buster
 
 # Install bluez and bluez-tools
 RUN apt-get update && apt-get install -y bluez bluez-tools
