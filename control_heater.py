@@ -19,27 +19,25 @@ MODE_UUID = "D97352B3-D19E-11E2-9E96-0800200C9A66"
 # Operating modes
 MODES = {
     0: "Off",
+<<<<<<< HEAD
     6: "Manual (Heating Element Temp)",  # Hex: 06s
     8: "Schedule (Heating Element Temp)"  # Hex: 08
+=======
+    5: "Manual (Room Temp)",
+    6: "Manual (Heating Element Temp)"
+>>>>>>> parent of 3359409 (Debug)
 }
-
 
 # Helper: Decode temperature values
 def decode_temperature(data):
-    # Decode 4 bytes: [current_temp, target_temp]
-    current_temp = ((data[0] * 255) + data[1]) / 10
-    target_temp = ((data[2] * 255) + data[3]) / 10
+    current_temp = ((data[1] << 8) | data[0]) / 10
+    target_temp = ((data[3] << 8) | data[2]) / 10
     return round(current_temp, 1), round(target_temp, 1)
 
-
 # Helper: Encode target temperature
-def encode_temperature(temp):
-    # Convert Celsius to Terma format (0.1°C scaling)
-    temp_value = int(temp * 10)
-    first_byte = temp_value // 255
-    second_byte = temp_value % 255
-    return first_byte.to_bytes(1, 'little') + second_byte.to_bytes(1, 'little')
-
+def encode_temperature(target_temp):
+    temp_value = int(target_temp * 10)
+    return temp_value.to_bytes(2, 'little')
 
 # Read heater settings
 async def read_heater_settings():
@@ -70,7 +68,7 @@ async def read_heater_settings():
 async def set_mode(mode):
     async with BleakClient(DEVICE_ADDRESS) as client:
         # Write the mode value
-        await client.write_gatt_char(MODE_UUID, bytes.fromhex("06"))
+        await client.write_gatt_char(MODE_UUID, mode.to_bytes(1, 'little'))
         print(f"Mode set to {MODES.get(mode, 'Unknown')}")
 
 # Set target temperature and mode
@@ -78,20 +76,20 @@ async def set_target_temperature(target_temp, mode):
     async with BleakClient(DEVICE_ADDRESS) as client:
         print("Connected to heater")
 
-        # Encode and write mode first
-        if mode == "HEAT":
-            await client.write_gatt_char(MODE_UUID, bytes.fromhex("06"))
-        elif mode == "AUTO":
-            await client.write_gatt_char(MODE_UUID, bytes.fromhex("08"))
-        elif mode == "OFF":
-            await client.write_gatt_char(MODE_UUID, bytes.fromhex("00"))
-
+        # Update the mode first
+        await client.write_gatt_char(MODE_UUID, mode.to_bytes(1, 'little'))
         print(f"Mode set to {MODES.get(mode, 'Unknown')}")
 
-        # Encode and write temperature
+        # Encode temperature
         encoded_temp = b'\x00\x00' + encode_temperature(target_temp)
-        await client.write_gatt_char(HEAT_TEMP_UUID, encoded_temp)
-        print(f"Set target temperature to {target_temp}°C in mode {mode}")
+
+        # Write temperature to appropriate characteristic
+        if mode == 5:  # Room temp mode
+            await client.write_gatt_char(ROOM_TEMP_UUID, encoded_temp)
+        elif mode == 6:  # Heating element temp mode
+            await client.write_gatt_char(HEAT_TEMP_UUID, encoded_temp)
+
+        print(f"Set target temperature to {target_temp}°C in mode {MODES.get(mode, 'Unknown')}")
 
 # Main interactive menu
 if __name__ == "__main__":
