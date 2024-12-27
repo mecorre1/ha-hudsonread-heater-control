@@ -41,8 +41,8 @@ async def read_heater_settings():
 
         # Read current mode with bit masking
         mode = await client.read_gatt_char(MODE_UUID)
-        mode = int.from_bytes(mode, byteorder='little') & 0x0F  # Mask unexpected bits
         print(f"Raw Mode Value: {mode}") # To compare against raw data
+        mode = int.from_bytes(mode, byteorder='little') & 0x0F  # Mask unexpected bits
         print(f"Current Mode: {MODES.get(mode, 'Unknown')}")
 
         # Read room temperature
