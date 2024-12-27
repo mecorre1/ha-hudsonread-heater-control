@@ -37,14 +37,11 @@ def decode_temperature(data):
     print(f"Raw data: {data.hex()}")
 
     # Decode using little-endian format
-    current_raw = (data[1] << 8) | data[0]
-    target_raw = (data[3] << 8) | data[2]
-
-    # Assume values are encoded in Fahrenheit (0.1°F scale)
-    current_temp = ((current_raw / 10) - 32) * 5 / 9  # Convert to Celsius
-    target_temp = ((target_raw / 10) - 32) * 5 / 9  # Convert to Celsius
+    current_temp = ((data[1] << 8) | data[0]) / 10  # Scale by 10 (0.1°C)
+    target_temp = ((data[3] << 8) | data[2]) / 10  # Scale by 10 (0.1°C)
 
     return round(current_temp, 1), round(target_temp, 1)
+
 
 
 
