@@ -19,7 +19,7 @@ MODE_UUID = "D97352B3-D19E-11E2-9E96-0800200C9A66"
 # Operating modes
 MODES = {
     0: "Off",
-    6: "Manual (Heating Element Temp)",  # Hex: 06
+    6: "Manual (Heating Element Temp)",  # Hex: 06s
     8: "Schedule (Heating Element Temp)"  # Hex: 08
 }
 
