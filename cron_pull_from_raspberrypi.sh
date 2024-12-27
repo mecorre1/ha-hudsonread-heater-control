@@ -19,7 +19,7 @@ PULL_STATUS=$?
 log_message "$PULL_OUTPUT"
 
 if [[ $PULL_STATUS -eq 0 ]]; then
-  # Check if there are updatess
+  # Check if there are updatesss
   if echo "$PULL_OUTPUT" | grep -q 'Already up to date'; then
     log_message "Already up to date"
   elif echo "$PULL_OUTPUT" | grep -q 'Fast-forward'; then
