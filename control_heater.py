@@ -1,77 +1,6 @@
+from bleak import BleakClient
 import asyncio
-import bleak
-from bleak import BleakClient, BleakScanner
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Define service and characteristic UUIDs
-SERVICE_UUID = "D97352XX-D19E-11E2-9E96-0800200C9A66"  # Replace XX if known
-TEMP_CHARACTERISTICS = {
-    "Room Temperature": "D97352B1-D19E-11E2-9E96-0800200C9A66",
-    "Heating Element Temperature": "D97352B2-D19E-11E2-9E96-0800200C9A66",
-}
-
-# Heater data structure
-class Heater:
-    def __init__(self, name, address):
-        self.name = name
-        self.address = address
-        self.client = None
-
-    async def connect(self):
-        try:
-            self.client = BleakClient(self.address)
-            await self.client.connect()
-            logger.info(f"Connected to {self.name} ({self.address})")
-            return True
-        except bleak.exc.BleakError as e:
-            logger.error(f"Connection error to {self.name} ({self.address}): {e}")
-            return False
-        except Exception as e:
-            logger.exception(f"An unexpected error occurred during connection to {self.name} ({self.address}): {e}")
-            return False
-
-    async def disconnect(self):
-        if self.client and self.client.is_connected:
-            await self.client.disconnect()
-            logger.info(f"Disconnected from {self.name} ({self.address})")
-            self.client = None
-
-    async def read_temperature(self, characteristic_uuid):
-        if not self.client or not self.client.is_connected:
-            logger.warning(f"Not connected to {self.name}. Cannot read temperature.")
-            return None
-        try:
-            data = await self.client.read_characteristic(characteristic_uuid)
-            current_temp = ((data[0] * 255) + data[1]) / 10
-            target_temp = ((data[2] * 255) + data[3]) / 10
-            return current_temp, target_temp
-        except Exception as e:
-            logger.error(f"Error reading from {self.name} - {characteristic_uuid}: {e}")
-            return None
-
-    async def set_target_temperature(self, characteristic_uuid, target_temp):
-        if not self.client or not self.client.is_connected:
-            logger.warning(f"Not connected to {self.name}. Cannot set temperature.")
-            return
-        try:
-            data = celsius_to_bytes(target_temp)
-            await self.client.write_characteristic(characteristic_uuid, data, without_response=True)
-            logger.info(f"Target temperature for {self.name} - {characteristic_uuid.split('-')[0]} set to {target_temp:.1f}°C")
-        except Exception as e:
-            logger.error(f"Error writing to {self.name} - {characteristic_uuid}: {e}")
-
-# Function to convert temperature from Celsius to bytes
-def celsius_to_bytes(temp):
-    if temp < 15 or temp > 60:
-        raise ValueError("Target temperature out of range (15-60°C)")
-    value = int(temp * 10)
-    return value.to_bytes(2, byteorder="big") + value.to_bytes(2, byteorder="big")
-
-async def main():
 # 2024-12-26T21:03:06.291629861Z Found device: Terma Wireless, Address: CC:22:37:11:30:EC
 # 2024-12-26T21:03:06.291661582Z Found device: Terma Wireless, Address: CC:22:37:11:5D:02
 # 2024-12-26T21:03:06.291725433Z Found device: Terma Wireless, Address: CC:22:37:11:1E:84
@@ -79,30 +8,85 @@ async def main():
 # 2024-12-26T21:03:06.291847246Z Found device: Terma Wireless, Address: CC:22:37:11:1E:40
 
 
+# Heater Bluetooth Address (Replace this with your device address)
+DEVICE_ADDRESS = "CC:22:37:11:26:4F"
 
-    heaters = [
-        Heater("Heater 1", "CC:22:37:11:30:EC"),  # Replace with actual addresses
-        Heater("Heater 2", "CC:22:37:11:5D:02"),  # Replace with actual addresses
-        Heater("Heater 3", "CC:22:37:11:1E:84"),  # Replace with actual addresses
-        Heater("Heater 4", "CC:22:37:11:26:4F"),  # Replace with actual addresses
-        Heater("Heater 5", "CC:22:37:11:1E:40"),  # Replace with actual addresses
-        # Add more heaters here
-    ]
+# UUIDs for characteristics
+ROOM_TEMP_UUID = "D97352B1-D19E-11E2-9E96-0800200C9A66"
+HEAT_TEMP_UUID = "D97352B2-D19E-11E2-9E96-0800200C9A66"
+MODE_UUID = "D97352B3-D19E-11E2-9E96-0800200C9A66"
 
-    for heater in heaters:
-        if not await heater.connect():
-            logger.error(f"Failed to connect to {heater.name}. Skipping.")
-            continue
+# Modes
+MODES = {
+    0: "Off",
+    5: "Manual (Room Temp)",
+    6: "Manual (Heating Element Temp)",
+    7: "Schedule (Room Temp)",
+    8: "Schedule (Heating Element Temp)"
+}
 
-        for name, uuid in TEMP_CHARACTERISTICS.items():
-            temps = await heater.read_temperature(uuid)
-            if temps:
-                current_temp, target_temp = temps
-                logger.info(f"{heater.name} - {name}: Current: {current_temp:.1f}°C, Target: {target_temp:.1f}°C")
+# --- Helper Functions ---
 
-        await heater.set_target_temperature(TEMP_CHARACTERISTICS["Room Temperature"], 22.5) #Example
+# Encode temperature to 4 bytes
+def encode_temperature(temp):
+    value = int(temp * 10)
+    return value.to_bytes(2, 'big')
 
-        await heater.disconnect()
+# Decode 4-byte temperature response
+def decode_temperature(data):
+    current_temp = ((data[0] * 255) + data[1]) / 10
+    target_temp = ((data[2] * 255) + data[3]) / 10
+    return current_temp, target_temp
 
+# --- Control Functions ---
+
+# Read current settings
+async def read_heater_settings():
+    async with BleakClient(DEVICE_ADDRESS) as client:
+        print("Connected to heater")
+
+        # Read current mode
+        mode = await client.read_gatt_char(MODE_UUID)
+        mode = int.from_bytes(mode, byteorder='little')
+        print(f"Current Mode: {MODES.get(mode, 'Unknown')}")
+
+        # Read room temperature
+        room_temp = await client.read_gatt_char(ROOM_TEMP_UUID)
+        current_temp, target_temp = decode_temperature(room_temp)
+        print(f"Room Temp - Current: {current_temp}°C, Target: {target_temp}°C")
+
+        # Read heating element temperature
+        heat_temp = await client.read_gatt_char(HEAT_TEMP_UUID)
+        current_temp, target_temp = decode_temperature(heat_temp)
+        print(f"Heating Element - Current: {current_temp}°C, Target: {target_temp}°C")
+
+# Set operating mode
+async def set_mode(mode):
+    async with BleakClient(DEVICE_ADDRESS) as client:
+        await client.write_gatt_char(MODE_UUID, mode.to_bytes(1, 'little'))
+        print(f"Mode set to {MODES.get(mode, 'Unknown')}")
+
+# Set target temperature
+async def set_target_temperature(temp, mode):
+    async with BleakClient(DEVICE_ADDRESS) as client:
+        encoded_temp = b'\x00\x00' + encode_temperature(temp)
+        if mode == 5:  # Room temp mode
+            await client.write_gatt_char(ROOM_TEMP_UUID, encoded_temp)
+        elif mode == 6:  # Heating element temp mode
+            await client.write_gatt_char(HEAT_TEMP_UUID, encoded_temp)
+        print(f"Set target temperature to {temp}°C in mode {MODES.get(mode, 'Unknown')}")
+
+# --- Main Menu ---
 if __name__ == "__main__":
-    asyncio.run(main())
+    action = input("Choose action - read (r), set mode (m), or set temperature (t): ").strip().lower()
+    if action == "r":
+        asyncio.run(read_heater_settings())
+    elif action == "m":
+        mode = int(input(f"Enter mode ({MODES}): "))
+        asyncio.run(set_mode(mode))
+    elif action == "t":
+        mode = int(input(f"Enter mode ({MODES}): "))
+        temp = float(input("Enter target temperature: "))
+        asyncio.run(set_target_temperature(temp, mode))
+    else:
+        print("Invalid action.")
