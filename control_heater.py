@@ -1,4 +1,4 @@
-from bleak import BleakClient
+from bleak import BleakClient, BleakError
 import asyncio
 
 # 2024-12-26T21:03:06.291629861Z Found device: Terma Wireless, Address: CC:22:37:11:30:EC
@@ -7,6 +7,7 @@ import asyncio
 # 2024-12-26T21:03:06.291819395Z Found device: Terma Wireless, Address: CC:22:37:11:26:4F
 # 2024-12-26T21:03:06.291847246Z Found device: Terma Wireless, Address: CC:22:37:11:1E:40
 
+
 # Bluetooth device address
 DEVICE_ADDRESS = "CC:22:37:11:26:4F"
 
@@ -14,6 +15,13 @@ DEVICE_ADDRESS = "CC:22:37:11:26:4F"
 ROOM_TEMP_UUID = "D97352B1-D19E-11E2-9E96-0800200C9A66"
 HEAT_TEMP_UUID = "D97352B2-D19E-11E2-9E96-0800200C9A66"
 MODE_UUID = "D97352B3-D19E-11E2-9E96-0800200C9A66"
+
+# Operating modes
+MODES = {
+    0: "Off",
+    5: "Manual (Room Temp)",
+    6: "Manual (Heating Element Temp)"
+}
 
 # Helper: Decode temperature values
 def decode_temperature(data):
@@ -31,10 +39,10 @@ async def read_heater_settings():
     async with BleakClient(DEVICE_ADDRESS) as client:
         print("Connected to heater")
 
-        # Read current mode
+        # Read current mode with bit masking
         mode = await client.read_gatt_char(MODE_UUID)
-        mode = int.from_bytes(mode, byteorder='little')
-        print(f"Current Mode: {mode}")
+        mode = int.from_bytes(mode, byteorder='little') & 0x0F  # Mask unexpected bits
+        print(f"Current Mode: {MODES.get(mode, 'Unknown')}")
 
         # Read room temperature
         room_temp = await client.read_gatt_char(ROOM_TEMP_UUID)
@@ -46,10 +54,21 @@ async def read_heater_settings():
         current_temp, target_temp = decode_temperature(heat_temp)
         print(f"Heating Element - Current: {current_temp}°C, Target: {target_temp}°C")
 
-# Set target temperature
-async def set_target_temperature(target_temp, mode=5):
+# Set mode
+async def set_mode(mode):
+    async with BleakClient(DEVICE_ADDRESS) as client:
+        # Write the mode value
+        await client.write_gatt_char(MODE_UUID, mode.to_bytes(1, 'little'))
+        print(f"Mode set to {MODES.get(mode, 'Unknown')}")
+
+# Set target temperature and mode
+async def set_target_temperature(target_temp, mode):
     async with BleakClient(DEVICE_ADDRESS) as client:
         print("Connected to heater")
+
+        # Update the mode first
+        await client.write_gatt_char(MODE_UUID, mode.to_bytes(1, 'little'))
+        print(f"Mode set to {MODES.get(mode, 'Unknown')}")
 
         # Encode temperature
         encoded_temp = b'\x00\x00' + encode_temperature(target_temp)
@@ -60,13 +79,14 @@ async def set_target_temperature(target_temp, mode=5):
         elif mode == 6:  # Heating element temp mode
             await client.write_gatt_char(HEAT_TEMP_UUID, encoded_temp)
 
-        print(f"Set target temperature to {target_temp}°C in mode {mode}")
+        print(f"Set target temperature to {target_temp}°C in mode {MODES.get(mode, 'Unknown')}")
 
 # Main interactive menu
 if __name__ == "__main__":
     while True:
         print("\nOptions:")
         print("  r - Read heater settings")
+        print("  m - Set mode")
         print("  t - Set target temperature")
         print("  q - Quit")
 
@@ -74,8 +94,17 @@ if __name__ == "__main__":
 
         if action == "r":
             asyncio.run(read_heater_settings())
+        elif action == "m":
+            print("\nAvailable Modes:")
+            for k, v in MODES.items():
+                print(f"  {k}: {v}")
+            mode = int(input("Enter mode: "))
+            asyncio.run(set_mode(mode))
         elif action == "t":
-            temp = float(input("Enter target temperature (°C) - Room Max 30, heating element max 60: "))
+            temp = float(input("Enter target temperature (°C): "))
+            print("\nAvailable Modes:")
+            for k, v in MODES.items():
+                print(f"  {k}: {v}")
             mode = int(input("Enter mode (5 for room, 6 for heating element): "))
             asyncio.run(set_target_temperature(temp, mode))
         elif action == "q":
