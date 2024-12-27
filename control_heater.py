@@ -34,6 +34,7 @@ def encode_temperature(temp):
 
 # Decode 4-byte temperature response
 def decode_temperature(data):
+    print(f"Raw data: {data.hex()}")
     current_temp = ((data[0] * 256) + data[1]) / 10
     target_temp = ((data[2] * 256) + data[3]) / 10
     return current_temp, target_temp
@@ -53,6 +54,7 @@ async def read_heater_settings():
 
         # Read room temperature
         room_temp = await client.read_gatt_char(ROOM_TEMP_UUID)
+        print(f"Raw Room Temp Data: {room_temp.hex()}")
         current_temp, target_temp = decode_temperature(room_temp)
         print(f"Room Temp - Current: {current_temp}°C, Target: {target_temp}°C")
 
