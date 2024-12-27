@@ -27,7 +27,7 @@ if [[ $PULL_STATUS -eq 0 ]]; then
     
     # Changes detected—proceed to build and restart the container
     COMMIT_HASH=$(git rev-parse HEAD)
-    log_message "Updated to commit hash: $COMMIT_HASH"
+    log_message "Updated to commit: $COMMIT_HASH"
 
     # Rebuild the Docker image
     docker build -t heater-controller . 2>&1 | tee -a "$LOG_FILE"
