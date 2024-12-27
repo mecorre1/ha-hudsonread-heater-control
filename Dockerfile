@@ -9,7 +9,7 @@ WORKDIR /app
 # Copy all files from the project folder into the container
 COPY . .
 
-# Install required libraries
+# Install required librariess
 RUN pip install --upgrade pip
 RUN pip install bleak
 
