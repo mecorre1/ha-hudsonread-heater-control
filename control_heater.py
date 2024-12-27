@@ -20,8 +20,10 @@ MODE_UUID = "D97352B3-D19E-11E2-9E96-0800200C9A66"
 MODES = {
     0: "Off",
     5: "Manual (Room Temp)",
-    6: "Manual (Heating Element Temp)"
+    6: "Manual (Heating Element Temp)",
+    33: "Manual (Heating Element Temp - Verified)"
 }
+
 
 # Helper: Decode temperature values
 def decode_temperature(data):
@@ -62,9 +64,18 @@ async def read_heater_settings():
 # Set mode
 async def set_mode(mode):
     async with BleakClient(DEVICE_ADDRESS) as client:
-        # Write the mode value
-        await client.write_gatt_char(MODE_UUID, mode.to_bytes(1, 'little'))
-        print(f"Mode set to {MODES.get(mode, 'Unknown')}")
+        mode_value = {
+            0: bytes.fromhex("00"),  # Off
+            5: bytes.fromhex("05"),  # Manual (Room Temp)
+            6: bytes.fromhex("06"),  # Manual (Heating Element Temp - Alt)
+            33: bytes.fromhex("21")  # Manual (Heating Element Temp - Verified)
+        }.get(mode)
+
+        if mode_value:
+            await client.write_gatt_char(MODE_UUID, mode_value)
+            print(f"Mode set to {MODES.get(mode, 'Unknown')}")
+        else:
+            print(f"Invalid mode: {mode}")
 
 # Set target temperature and mode
 async def set_target_temperature(target_temp, mode):
