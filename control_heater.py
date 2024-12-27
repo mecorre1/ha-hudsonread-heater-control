@@ -75,18 +75,26 @@ async def set_mode(mode):
             print(f"Invalid mode: {mode}")
 
 # Set temperature only
-async def set_target_temperature(target_temp, mode):
+# Set temperature only (no mode input required)
+async def set_target_temperature(target_temp):
     async with BleakClient(DEVICE_ADDRESS) as client:
         print("Connected to heater")
+
+        # Read current mode to decide which characteristic to write to
+        mode = await client.read_gatt_char(MODE_UUID)
+        decoded_mode = int.from_bytes(mode, byteorder='little')
 
         # Encode temperature
         encoded_temp = b'\x00\x00' + encode_temperature(target_temp)
 
-        # Write temperature to appropriate characteristic
-        if mode == 5:  # Room temp mode
+        # Write temperature based on current mode
+        if decoded_mode == 5:  # Room temp mode
             await client.write_gatt_char(ROOM_TEMP_UUID, encoded_temp)
-        elif mode == 6 or mode == 33:  # Heating element temp mode
+        elif decoded_mode == 6 or decoded_mode == 33:  # Heating element modes
             await client.write_gatt_char(HEAT_TEMP_UUID, encoded_temp)
+        else:
+            print(f"Current mode {decoded_mode} does not support temperature setting.")
+            return
 
         print(f"Set target temperature to {target_temp}°C")
 
@@ -111,11 +119,7 @@ if __name__ == "__main__":
             asyncio.run(set_mode(mode))
         elif action == "t":
             temp = float(input("Enter target temperature (°C): "))
-            print("\nAvailable Modes:")
-            for k, v in MODES.items():
-                print(f"  {k}: {v}")
-            mode = int(input("Enter mode for temperature (5 for room, 6 or 33 for heating element): "))
-            asyncio.run(set_target_temperature(temp, mode))
+            asyncio.run(set_target_temperature(temp))
         elif action == "q":
             print("Exiting...")
             break
