@@ -23,9 +23,11 @@ if [[ $PULL_STATUS -eq 0 ]]; then
   if echo "$PULL_OUTPUT" | grep -q 'Already up to date'; then
     log_message "Already up to date"
   elif echo "$PULL_OUTPUT" | grep -q 'Fast-forward'; then
+
+    
     # Changes detected—proceed to build and restart the container
     COMMIT_HASH=$(git rev-parse HEAD)
-    log_message "Updated to commit: $COMMIT_HASH"
+    log_message "Updated to commit hash: $COMMIT_HASH"
 
     # Rebuild the Docker image
     docker build -t heater-controller . 2>&1 | tee -a "$LOG_FILE"
