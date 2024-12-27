@@ -34,9 +34,10 @@ def encode_temperature(temp):
 
 # Decode 4-byte temperature response
 def decode_temperature(data):
-    current_temp = ((data[0] * 255) + data[1]) / 10
-    target_temp = ((data[2] * 255) + data[3]) / 10
+    current_temp = ((data[0] * 256) + data[1]) / 10
+    target_temp = ((data[2] * 256) + data[3]) / 10
     return current_temp, target_temp
+
 
 # --- Control Functions ---
 
