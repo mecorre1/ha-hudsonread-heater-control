@@ -32,12 +32,20 @@ def encode_temperature(temp):
     value = int(temp * 10)
     return value.to_bytes(2, 'big')
 
-# Decode 4-byte temperature response
 def decode_temperature(data):
+    # Debug output for raw data
     print(f"Raw data: {data.hex()}")
-    current_temp = ((data[0] * 256) + data[1]) / 10
-    target_temp = ((data[2] * 256) + data[3]) / 10
-    return current_temp, target_temp
+
+    # Decode using little-endian format
+    current_raw = (data[1] << 8) | data[0]
+    target_raw = (data[3] << 8) | data[2]
+
+    # Assume values are encoded in Fahrenheit (0.1°F scale)
+    current_temp = ((current_raw / 10) - 32) * 5 / 9  # Convert to Celsius
+    target_temp = ((target_raw / 10) - 32) * 5 / 9  # Convert to Celsius
+
+    return round(current_temp, 1), round(target_temp, 1)
+
 
 
 # --- Control Functions ---
