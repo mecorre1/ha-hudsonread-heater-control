@@ -19,13 +19,8 @@ MODE_UUID = "D97352B3-D19E-11E2-9E96-0800200C9A66"
 # Operating modes
 MODES = {
     0: "Off",
-<<<<<<< HEAD
-    6: "Manual (Heating Element Temp)",  # Hex: 06s
-    8: "Schedule (Heating Element Temp)"  # Hex: 08
-=======
     5: "Manual (Room Temp)",
     6: "Manual (Heating Element Temp)"
->>>>>>> parent of 3359409 (Debug)
 }
 
 # Helper: Decode temperature values
