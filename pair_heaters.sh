@@ -20,7 +20,7 @@ for HEATER in $HEATERS; do
   log "Processing heater: $HEATER"
 
   # Check if the device is already paired
-  PAIRED=$(bluetoothctl paired-devices | grep $HEATER)
+  PAIRED=$(bluetoothctl devices Paired | grep $HEATER)
 
   # Remove device if already paired but not connected
   if [ ! -z "$PAIRED" ]; then
@@ -40,13 +40,14 @@ for HEATER in $HEATERS; do
     echo "agent on"
     echo "default-agent"
     echo "scan on"
+    sleep 1
     echo "pair $HEATER"
-    sleep 2
+    sleep 1
     echo $PIN
     sleep 1
     echo "trust $HEATER"
     echo "connect $HEATER"
-    sleep 2
+    sleep 1
     echo "quit"
   ) | bluetoothctl
 
