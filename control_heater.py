@@ -1,28 +1,32 @@
-from bleak import BleakClient, BleakError
+import json
 import asyncio
-
-# 2024-12-26T21:03:06.291629861Z Found device: Terma Wireless, Address: CC:22:37:11:30:EC
-# 2024-12-26T21:03:06.291661582Z Found device: Terma Wireless, Address: CC:22:37:11:5D:02
-# 2024-12-26T21:03:06.291725433Z Found device: Terma Wireless, Address: CC:22:37:11:1E:84
-# 2024-12-26T21:03:06.291819395Z Found device: Terma Wireless, Address: CC:22:37:11:26:4F
-# 2024-12-26T21:03:06.291847246Z Found device: Terma Wireless, Address: CC:22:37:11:1E:40
-
-
-# Bluetooth device address
-DEVICE_ADDRESS = "CC:22:37:11:26:4F"
+from bleak import BleakClient
 
 # UUIDs for heater characteristics
-ROOM_TEMP_UUID = "D97352B1-D19E-11E2-9E96-0800200C9A66"
-HEAT_TEMP_UUID = "D97352B2-D19E-11E2-9E96-0800200C9A66"
-MODE_UUID = "D97352B3-D19E-11E2-9E96-0800200C9A66"
+ROOM_TEMP_UUID = "d97352b1-d19e-11e2-9e96-0800200c9a66"
+HEAT_TEMP_UUID = "d97352b2-d19e-11e2-9e96-0800200c9a66"
+MODE_UUID = "d97352b3-d19e-11e2-9e96-0800200c9a66"
 
-# Operating modes
+# Modes Mapping
 MODES = {
     0: "Off",
     5: "Manual (Room Temp)",
     6: "Manual (Heating Element Temp)",
     33: "Manual (Heating Element Temp - Verified)"
 }
+MODE_ENCODINGS = {
+    "Off": bytes([0x00]),
+    "Manual (Room Temp)": bytes([0x05]),
+    "Manual (Heating Element Temp)": bytes([0x06])
+}
+
+# Load rooms configuration
+with open("rooms.json", "r") as file:
+    rooms = json.load(file)
+
+# ------------------------------------
+# Helper Functions
+# ------------------------------------
 
 # Helper: Decode temperature values
 def decode_temperature(data):
@@ -35,93 +39,115 @@ def encode_temperature(target_temp):
     temp_value = int(target_temp * 10)
     return temp_value.to_bytes(2, 'little')
 
-# Read heater settings
-async def read_heater_settings():
-    async with BleakClient(DEVICE_ADDRESS) as client:
-        print("Connected to heater")
+# Helper: Read mode
+async def read_mode(client):
+    data = await client.read_gatt_char(MODE_UUID)
+    mode = int.from_bytes(data, byteorder='little')
+    return MODES.get(mode, f"Unknown ({mode})")
 
-        # Read current mode
-        mode = await client.read_gatt_char(MODE_UUID)
-        print(f"Raw Mode Data: {mode.hex()}")
-        decoded_mode = int.from_bytes(mode, byteorder='little')
-        print(f"Decoded Mode Value: {decoded_mode}")
-        print(f"Current Mode: {MODES.get(decoded_mode, f'Unknown ({decoded_mode})')}")
+# Helper: Read temperatures
+async def read_temperatures(client):
+    room_temp_data = await client.read_gatt_char(ROOM_TEMP_UUID)
+    heat_temp_data = await client.read_gatt_char(HEAT_TEMP_UUID)
 
-        # Read room temperature
-        room_temp = await client.read_gatt_char(ROOM_TEMP_UUID)
-        current_temp, target_temp = decode_temperature(room_temp)
-        print(f"Room Temp - Current: {current_temp}°C, Target: {target_temp}°C")
+    room_temp = decode_temperature(room_temp_data)
+    heat_temp = decode_temperature(heat_temp_data)
+    return room_temp, heat_temp
 
-        # Read heating element temperature
-        heat_temp = await client.read_gatt_char(HEAT_TEMP_UUID)
-        current_temp, target_temp = decode_temperature(heat_temp)
-        print(f"Heating Element - Current: {current_temp}°C, Target: {target_temp}°C")
+# Helper: Set mode
+async def set_mode(client, mode):
+    if mode in MODE_ENCODINGS:
+        await client.write_gatt_char(MODE_UUID, MODE_ENCODINGS[mode])
+        print(f"Mode set to: {mode}")
+    else:
+        print("Invalid mode")
 
-# Set mode only
-async def set_mode(mode):
-    async with BleakClient(DEVICE_ADDRESS) as client:
-        # Mode encoding
-        mode_value = {
-            0: bytes.fromhex("00"),  # Off
-            5: bytes.fromhex("05"),  # Manual (Room Temp)
-            6: bytes.fromhex("06"),  # Manual (Heating Element Temp - Alt)
-            33: bytes.fromhex("21")  # Manual (Heating Element Temp - Verified)
-        }.get(mode)
+# Helper: Set temperature
+async def set_temperature(client, target_temp, mode_uuid):
+    encoded_temp = b'\x00\x00' + encode_temperature(target_temp)
+    await client.write_gatt_char(mode_uuid, encoded_temp)
+    print(f"Temperature set to: {target_temp}°C")
 
-        if mode_value:
-            await client.write_gatt_char(MODE_UUID, mode_value)
-            print(f"Mode set to {MODES.get(mode, 'Unknown')}")
-        else:
-            print(f"Invalid mode: {mode}")
+# ------------------------------------
+# Multi-Heater Actions
+# ------------------------------------
 
-# Set temperature only
-# Set temperature only (no mode input required)
-async def set_target_temperature(target_temp):
-    async with BleakClient(DEVICE_ADDRESS) as client:
-        print("Connected to heater")
+# Read settings for all heaters in a room
+async def read_room_settings(room):
+    if room not in rooms:
+        print(f"Room '{room}' not found.")
+        return
 
-        # Read current mode to decide which characteristic to write to
-        mode = await client.read_gatt_char(MODE_UUID)
-        decoded_mode = int.from_bytes(mode, byteorder='little')
+    for heater in rooms[room]:
+        print(f"Connecting to heater: {heater}")
+        async with BleakClient(heater) as client:
+            mode = await read_mode(client)
+            room_temp, heat_temp = await read_temperatures(client)
 
-        # Encode temperature
-        encoded_temp = b'\x00\x00' + encode_temperature(target_temp)
+            print(f"Heater {heater}")
+            print(f"  Mode: {mode}")
+            print(f"  Room Temp - Current: {room_temp[0]}°C, Target: {room_temp[1]}°C")
+            print(f"  Heating Element - Current: {heat_temp[0]}°C, Target: {heat_temp[1]}°C")
+            print()
 
-        # Write temperature based on current mode
-        if decoded_mode == 5:  # Room temp mode
-            await client.write_gatt_char(ROOM_TEMP_UUID, encoded_temp)
-        elif decoded_mode == 6 or decoded_mode == 33:  # Heating element modes
-            await client.write_gatt_char(HEAT_TEMP_UUID, encoded_temp)
-        else:
-            print(f"Current mode {decoded_mode} does not support temperature setting.")
-            return
+# Set mode for all heaters in a room
+async def set_room_mode(room, mode):
+    if room not in rooms:
+        print(f"Room '{room}' not found.")
+        return
 
-        print(f"Set target temperature to {target_temp}°C")
+    for heater in rooms[room]:
+        print(f"Connecting to heater: {heater}")
+        async with BleakClient(heater) as client:
+            await set_mode(client, mode)
 
-# Main interactive menu
-if __name__ == "__main__":
+# Set temperature for all heaters in a room
+async def set_room_temperature(room, target_temp, target_type):
+    if room not in rooms:
+        print(f"Room '{room}' not found.")
+        return
+
+    uuid = ROOM_TEMP_UUID if target_type == "room" else HEAT_TEMP_UUID
+    for heater in rooms[room]:
+        print(f"Connecting to heater: {heater}")
+        async with BleakClient(heater) as client:
+            await set_temperature(client, target_temp, uuid)
+
+# ------------------------------------
+# Main Menu
+# ------------------------------------
+
+async def main():
     while True:
         print("\nOptions:")
-        print("  r - Read heater settings")
-        print("  m - Set mode")
-        print("  t - Set target temperature")
+        print("  r - Read room settings")
+        print("  m - Set room mode")
+        print("  t - Set room temperature")
         print("  q - Quit")
-
         action = input("Choose action: ").strip().lower()
 
         if action == "r":
-            asyncio.run(read_heater_settings())
+            room = input("Enter room name: ").strip().lower()
+            await read_room_settings(room)
+
         elif action == "m":
-            print("\nAvailable Modes:")
-            for k, v in MODES.items():
-                print(f"  {k}: {v}")
-            mode = int(input("Enter mode: "))
-            asyncio.run(set_mode(mode))
+            room = input("Enter room name: ").strip().lower()
+            mode = input("Enter mode (Off, Manual (Room Temp), Manual (Heating Element Temp)): ").strip()
+            await set_room_mode(room, mode)
+
         elif action == "t":
-            temp = float(input("Enter target temperature (°C): "))
-            asyncio.run(set_target_temperature(temp))
+            room = input("Enter room name: ").strip().lower()
+            target_temp = float(input("Enter target temperature (°C): ").strip())
+            target_type = input("Target type? (room/heater): ").strip().lower()
+            await set_room_temperature(room, target_temp, target_type)
+
         elif action == "q":
-            print("Exiting...")
             break
+
         else:
             print("Invalid action. Try again.")
+
+# ------------------------------------
+
+if __name__ == "__main__":
+    asyncio.run(main())
