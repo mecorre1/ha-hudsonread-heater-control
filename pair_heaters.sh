@@ -24,22 +24,15 @@ for HEATER in $HEATERS; do
 
   # Remove device if already paired but not connected
   if [ ! -z "$PAIRED" ]; then
-    CONNECTED=$(bluetoothctl info $HEATER | grep "Connected: yes")
-
-    if [ -z "$CONNECTED" ]; then
-      log "Device $HEATER is paired but not connected. Removing..."
-      bluetoothctl remove $HEATER
-    else
-      log "Device $HEATER is already connected. Skipping..."
-      continue
-    fi
+    log "Device $HEATER is already connected. Skipping..."
+    continue
   fi
   # Pair and trust the device
   log "Attempting to pair $HEATER"
   (
+    echo "scan on"
     echo "agent on"
     echo "default-agent"
-    echo "scan on"
     sleep 1
     echo "pair $HEATER"
     sleep 1
@@ -47,14 +40,16 @@ for HEATER in $HEATERS; do
     sleep 1
     echo "trust $HEATER"
     echo "connect $HEATER"
-    sleep 1
-    echo "quit"
   ) | bluetoothctl
 
   # Verify connection
   CONNECTED=$(bluetoothctl info $HEATER | grep "Connected: yes")
   if [ ! -z "$CONNECTED" ]; then
     log "Successfully paired and connected to $HEATER"
+    (
+    echo "disconnect $HEATER"
+    echo "quit"
+    ) | bluetoothctl
   else
     log "Failed to connect to $HEATER"
   fi
