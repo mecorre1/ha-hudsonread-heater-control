@@ -34,12 +34,12 @@ for HEATER in $HEATERS; do
       continue
     fi
   fi
-
   # Pair and trust the device
   log "Attempting to pair $HEATER"
   (
     echo "agent on"
     echo "default-agent"
+    echo "scan on"
     echo "pair $HEATER"
     sleep 2
     echo $PIN
