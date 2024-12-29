@@ -13,8 +13,8 @@ if ! command -v bluetoothctl &> /dev/null; then
   exit 1
 fi
 
-# Read rooms.json and extract devices
-HEATERS=$(jq -r '.[] | .[]' $CONFIG_FILE)
+# Read rooms.json and extract devices with room info
+ROOMS=$(jq -r 'to_entries[] | {room: .key, heaters: .value}' $CONFIG_FILE)
 
 # Start Scanning
 (
@@ -26,79 +26,98 @@ HEATERS=$(jq -r '.[] | .[]' $CONFIG_FILE)
     sleep 1
 ) | bluetoothctl
 
-for HEATER in $HEATERS; do
-  log "Processing heater: $HEATER"
+declare -A SUMMARY  # Store results for summary
 
-  # Check if the device is already paired
-  PAIRED=$(bluetoothctl info $HEATER | grep "Paired: yes")
+for ROOM in $(echo "$ROOMS" | jq -c '.'); do
+  ROOM_NAME=$(echo "$ROOM" | jq -r '.room')
+  HEATERS=$(echo "$ROOM" | jq -r '.heaters[]')
 
-  if [ ! -z "$PAIRED" ]; then
-    # Attempt to connect up to 3 times
-    RETRIES=3
-    while [ $RETRIES -gt 0 ]; do
-      log "Attempting to connect to already paired device: $HEATER (Retries left: $RETRIES)"
-      bluetoothctl connect $HEATER
-      sleep 4  # Increased delay to 4 seconds
+  INDEX=1
+  for HEATER in $HEATERS; do
+    log "Processing heater $INDEX in room $ROOM_NAME (ID: $HEATER)"
 
-      # Log the full device info for debugging
-      DEVICE_INFO=$(bluetoothctl info $HEATER)
-      log "Device Info After Connect Attempt: $DEVICE_INFO"
+    # Check if the device is already paired
+    PAIRED=$(bluetoothctl info $HEATER | grep "Paired: yes")
 
-      # Check if the device is now connected
-      if echo "$DEVICE_INFO" | grep -q "Connected: yes"; then
-        log "Device $HEATER is already connectable. Skipping..."
-        bluetoothctl disconnect $HEATER
-        log "Disconnecting $HEATER to free it for the Python script."
-        sleep 2
-        continue 2  # Skip the rest and move to the next heater
+    if [ ! -z "$PAIRED" ]; then
+      # Attempt to connect up to 3 times
+      RETRIES=3
+      while [ $RETRIES -gt 0 ]; do
+        log "Attempting to connect to paired heater $INDEX in room $ROOM_NAME (ID: $HEATER) (Retries left: $RETRIES)"
+        bluetoothctl connect $HEATER
+        sleep 4  # Increased delay to 4 seconds
+
+        # Log device info for debugging
+        DEVICE_INFO=$(bluetoothctl info $HEATER)
+        log "Device Info After Connect Attempt for $HEATER: $DEVICE_INFO"
+
+        # Check if connected
+        if echo "$DEVICE_INFO" | grep -q "Connected: yes"; then
+          log "Heater $INDEX in room $ROOM_NAME (ID: $HEATER) is connectable. Skipping..."
+          bluetoothctl disconnect $HEATER
+          log "Disconnecting heater $INDEX in room $ROOM_NAME (ID: $HEATER) to free it for the Python script."
+          sleep 2
+          SUMMARY["$ROOM_NAME - Heater $INDEX (ID: $HEATER)"]="Connectable"
+          continue 2  # Skip the rest and move to the next heater
+        fi
+
+        RETRIES=$((RETRIES - 1))
+      done
+
+      # If retries fail, remove the device and prompt user
+      log "Failed to connect to heater $INDEX in room $ROOM_NAME (ID: $HEATER) after retries. Removing device."
+      bluetoothctl remove $HEATER
+      sleep 2
+    fi
+
+    # Prompt user for pairing mode
+    while true; do
+      read -p "Put heater $INDEX in room $ROOM_NAME (ID: $HEATER) in pairing mode (blinking light). Ready? (y/n): " CONFIRM
+      if [[ "$CONFIRM" == "y" ]]; then
+        break
+      elif [[ "$CONFIRM" == "n" ]]; then
+        log "User skipped pairing for heater $INDEX in room $ROOM_NAME (ID: $HEATER)."
+        SUMMARY["$ROOM_NAME - Heater $INDEX (ID: $HEATER)"]="Skipped by User"
+        continue 2  # Skip to next heater
+      else
+        echo "Invalid response. Please type 'y' or 'n'."
       fi
-
-      RETRIES=$((RETRIES - 1))
     done
 
-    # If retries fail, remove the device and prompt user
-    log "Failed to connect to $HEATER after retries. Removing device."
-    bluetoothctl remove $HEATER
-    sleep 2
-	fi
+    # Attempt pairing
+    log "Attempting to pair heater $INDEX in room $ROOM_NAME (ID: $HEATER)"
+    (
+        echo "pair $HEATER"
+        sleep 2
+        echo $PIN
+        sleep 2
+        echo "trust $HEATER"
+        sleep 2
+        echo "connect $HEATER"
+        sleep 2
+    ) | bluetoothctl
 
-	# Prompt user to put heater in pairing mode
-	while true; do
-		read -p "Please put heater $HEATER in pairing mode (blinking light). Ready? (yes/no): " CONFIRM
-		if [[ "$CONFIRM" == "yes" ]]; then
-			break
-		elif [[ "$CONFIRM" == "no" ]]; then
-			log "User chose to skip pairing for $HEATER."
-			continue 2  # Skip to the next heater
-		else
-			echo "Invalid response. Please type 'yes' or 'no'."
-		fi
-	done
+    # Verify connection
+    if bluetoothctl info $HEATER | grep -q "Connected: yes"; then
+        log "Successfully paired and connected heater $INDEX in room $ROOM_NAME (ID: $HEATER)"
 
-  # Attempt pairing if not connectable
-  log "Attempting to pair $HEATER"
-  (
-      echo "pair $HEATER"
-      sleep 2
-      echo $PIN
-      sleep 2
-      echo "trust $HEATER"
-      sleep 2
-      echo "connect $HEATER"
-      sleep 2
-  ) | bluetoothctl
+        # Disconnect to allow Python script access
+        log "Disconnecting heater $INDEX in room $ROOM_NAME (ID: $HEATER) to free it for the Python script."
+        bluetoothctl disconnect $HEATER
+        sleep 2
+        SUMMARY["$ROOM_NAME - Heater $INDEX (ID: $HEATER)"]="Paired and Connectable"
+    else
+        log "Failed to connect heater $INDEX in room $ROOM_NAME (ID: $HEATER)"
+        SUMMARY["$ROOM_NAME - Heater $INDEX (ID: $HEATER)"]="Failed"
+    fi
 
-  # Verify connection
-  if bluetoothctl info $HEATER | grep -q "Connected: yes"; then
-      log "Successfully paired and connected to $HEATER"
-
-      # **Disconnect the heater to allow Python script access**
-      log "Disconnecting $HEATER to free it for the Python script."
-      bluetoothctl disconnect $HEATER
-      sleep 2
-  else
-      log "Failed to connect to $HEATER"
-  fi
+    INDEX=$((INDEX + 1))
+  done
 done
 
+# Print Summary
 log "Pairing process completed!"
+log "Heater Pairing Summary:"
+for KEY in "${!SUMMARY[@]}"; do
+  log "$KEY - ${SUMMARY[$KEY]}"
+done
