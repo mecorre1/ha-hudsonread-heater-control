@@ -36,7 +36,7 @@ for HEATER in $HEATERS; do
    # Attempt to connect first
 	 	log "Attempting to connect already paired device: $HEATER"
 		bluetoothctl connect $HEATER
-		sleep 2  # Wait 2 seconds to allow connection to establish
+		sleep 4  # Wait 4 seconds to allow connection to establish
 
 		# Check if the device is now connected
 		if bluetoothctl info $HEATER | grep -q "Connected: yes"; then
