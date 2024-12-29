@@ -19,17 +19,17 @@ HEATERS=$(jq -r '.[] | .[]' $CONFIG_FILE)
 # Start Scanning
 (
     echo "scan on"
-    sleep 2
+    sleep 1
     echo "agent on"
-    sleep 2
+    sleep 1
     echo "default-agent"
-    sleep 2
+    sleep 1
 ) | bluetoothctl
 
 for HEATER in $HEATERS; do
   log "Processing heater: $HEATER"
 
-  # Check if the device is already paired
+  # Check if the device is already paSired
   PAIRED=$(bluetoothctl info $HEATER | grep "Paired: yes")
 
   if [ ! -z "$PAIRED" ]; then
@@ -60,6 +60,8 @@ for HEATER in $HEATERS; do
       echo $PIN
       sleep 2
 			echo "trust $HEATER"
+      sleep 2
+			echo "connect $HEATER"
       sleep 2
   ) | bluetoothctl
 
