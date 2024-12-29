@@ -61,7 +61,7 @@ for HEATER in $HEATERS; do
     bluetoothctl remove $HEATER
     sleep 2
 	fi
-	
+
 	# Prompt user to put heater in pairing mode
 	while true; do
 		read -p "Please put heater $HEATER in pairing mode (blinking light). Ready? (yes/no): " CONFIRM
@@ -74,7 +74,6 @@ for HEATER in $HEATERS; do
 			echo "Invalid response. Please type 'yes' or 'no'."
 		fi
 	done
-  fi
 
   # Attempt pairing if not connectable
   log "Attempting to pair $HEATER"
