@@ -16,42 +16,57 @@ fi
 # Read rooms.json and extract devices
 HEATERS=$(jq -r '.[] | .[]' $CONFIG_FILE)
 
+# Start scanning
+bluetoothctl <<EOF
+scan on
+agent on
+default-agent
+EOF
+
 for HEATER in $HEATERS; do
   log "Processing heater: $HEATER"
 
   # Check if the device is already paired
-  PAIRED=$(bluetoothctl devices Paired | grep $HEATER)
+  PAIRED=$(bluetoothctl paired-devices | grep $HEATER)
 
-  # Remove device if already paired but not connected
   if [ ! -z "$PAIRED" ]; then
-    log "Device $HEATER is already connected. Skipping..."
-    continue
+   # Attempt to connect first
+		bluetoothctl connect $HEATER
+		sleep 2  # Wait 2 seconds to allow connection to establish
+
+		# Check if the device is now connected
+		if bluetoothctl info $HEATER | grep -q "Connected: yes"; then
+        log "Device $HEATER is already connectable. Skipping..."
+        continue
+    fi
+
+    # If paired but not connectable, remove and retry pairing
+    log "Device $HEATER is paired but not connectable. Removing..."
+    bluetoothctl remove $HEATER
   fi
-  # Pair and trust the device
+
+  # Attempt pairing if not connectable
   log "Attempting to pair $HEATER"
   (
-    echo "scan on"
-    echo "agent on"
-    echo "default-agent"
-    sleep 1
-    echo "pair $HEATER"
-    sleep 1
-    echo $PIN
-    sleep 1
-    echo "trust $HEATER"
-    echo "connect $HEATER"
+      echo "pair $HEATER"
+      sleep 2
+      echo $PIN
+      sleep 1
+      echo "trust $HEATER"
+      sleep 1
+      echo "connect $HEATER"
+      sleep 2
   ) | bluetoothctl
 
   # Verify connection
-  CONNECTED=$(bluetoothctl info $HEATER | grep "Connected: yes")
-  if [ ! -z "$CONNECTED" ]; then
-    log "Successfully paired and connected to $HEATER"
-    (
-    echo "disconnect $HEATER"
-    echo "quit"
-    ) | bluetoothctl
+  if bluetoothctl info $HEATER | grep -q "Connected: yes"; then
+      log "Successfully paired and connected to $HEATER"
+
+      # **Disconnect the heater to allow Python script access**
+      log "Disconnecting $HEATER to free it for the Python script."
+      bluetoothctl disconnect $HEATER
   else
-    log "Failed to connect to $HEATER"
+      log "Failed to connect to $HEATER"
   fi
 done
 
