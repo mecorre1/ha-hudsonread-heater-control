@@ -60,19 +60,20 @@ for HEATER in $HEATERS; do
     log "Failed to connect to $HEATER after retries. Removing device."
     bluetoothctl remove $HEATER
     sleep 2
-
-    # Prompt user to put heater in pairing mode
-    while true; do
-      read -p "Please put heater $HEATER in pairing mode (blinking light). Ready? (yes/no): " CONFIRM
-      if [[ "$CONFIRM" == "yes" ]]; then
-        break
-      elif [[ "$CONFIRM" == "no" ]]; then
-        log "User chose to skip pairing for $HEATER."
-        continue 2  # Skip to the next heater
-      else
-        echo "Invalid response. Please type 'yes' or 'no'."
-      fi
-    done
+	fi
+	
+	# Prompt user to put heater in pairing mode
+	while true; do
+		read -p "Please put heater $HEATER in pairing mode (blinking light). Ready? (yes/no): " CONFIRM
+		if [[ "$CONFIRM" == "yes" ]]; then
+			break
+		elif [[ "$CONFIRM" == "no" ]]; then
+			log "User chose to skip pairing for $HEATER."
+			continue 2  # Skip to the next heater
+		else
+			echo "Invalid response. Please type 'yes' or 'no'."
+		fi
+	done
   fi
 
   # Attempt pairing if not connectable
