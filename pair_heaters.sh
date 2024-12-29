@@ -33,25 +33,29 @@ for HEATER in $HEATERS; do
   PAIRED=$(bluetoothctl info $HEATER | grep "Paired: yes")
 
   if [ ! -z "$PAIRED" ]; then
-   # Attempt to connect first
-	 	log "Attempting to connect already paired device: $HEATER"
+		# Attempt to connect first
+		log "Attempting to connect already paired device: $HEATER"
 		bluetoothctl connect $HEATER
-		sleep 4  # Wait 4 seconds to allow connection to establish
-		log(bluetoothctl info $HEATER)
+		sleep 4  # Increased delay to 4 seconds
+
+		# Log the full device info for debugging
+		DEVICE_INFO=$(bluetoothctl info $HEATER)
+		log "Device Info After Connect Attempt: $DEVICE_INFO"
+
 		# Check if the device is now connected
-		if bluetoothctl info $HEATER | grep "Connected: yes"; then
-        log "Device $HEATER is already connectable. Skipping..."
-        bluetoothctl disconnect $HEATER
+		if echo "$DEVICE_INFO" | grep -q "Connected: yes"; then
+				log "Device $HEATER is already connectable. Skipping..."
+				bluetoothctl disconnect $HEATER
 				log "Disconnecting $HEATER to free it for the Python script."
 				sleep 2
 				continue
-    else
-			# If paired but not connectable, remove and retry pairing
-			log "Device $HEATER is paired but not connectable. Removing..."
-			bluetoothctl remove $HEATER
-			sleep 2
+		else
+				# If paired but not connectable, remove and retry pairing
+				log "Device $HEATER is paired but not connectable. Removing..."
+				bluetoothctl remove $HEATER
+				sleep 2
 		fi
-  fi
+	fi
 
   # Attempt pairing if not connectable
   log "Attempting to pair $HEATER"
