@@ -16,12 +16,15 @@ fi
 # Read rooms.json and extract devices
 HEATERS=$(jq -r '.[] | .[]' $CONFIG_FILE)
 
-# Start scanning
-bluetoothctl <<EOF
-scan on
-agent on
-default-agent
-EOF
+# Start Scanning
+(
+    echo "scan on"
+    sleep 2
+    echo "agent on"
+    sleep 2
+    echo "default-agent"
+    sleep 2
+) | bluetoothctl
 
 for HEATER in $HEATERS; do
   log "Processing heater: $HEATER"
@@ -31,6 +34,7 @@ for HEATER in $HEATERS; do
 
   if [ ! -z "$PAIRED" ]; then
    # Attempt to connect first
+	 	log "Attempting to connect already paired device: $HEATER"
 		bluetoothctl connect $HEATER
 		sleep 2  # Wait 2 seconds to allow connection to establish
 
@@ -51,10 +55,6 @@ for HEATER in $HEATERS; do
       echo "pair $HEATER"
       sleep 2
       echo $PIN
-      sleep 1
-      echo "trust $HEATER"
-      sleep 1
-      echo "connect $HEATER"
       sleep 2
   ) | bluetoothctl
 
@@ -65,6 +65,7 @@ for HEATER in $HEATERS; do
       # **Disconnect the heater to allow Python script access**
       log "Disconnecting $HEATER to free it for the Python script."
       bluetoothctl disconnect $HEATER
+			sleep 2
   else
       log "Failed to connect to $HEATER"
   fi
