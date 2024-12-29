@@ -49,6 +49,7 @@ for HEATER in $HEATERS; do
 			# If paired but not connectable, remove and retry pairing
 			log "Device $HEATER is paired but not connectable. Removing..."
 			bluetoothctl remove $HEATER
+			sleep 2
 		fi
   fi
 
