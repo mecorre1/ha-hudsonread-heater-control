@@ -5,7 +5,7 @@ app = Flask(__name__)
 # Sample endpoint to set temperature
 @app.route('/set-temp', methods=['POST'])
 def set_temperature():
-    data = request.json
+    data = request.get_json(force=True)
     temp = data.get('temperature')
 
     if not temp or not isinstance(temp, (int, float)):
