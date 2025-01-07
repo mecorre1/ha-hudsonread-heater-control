@@ -12,5 +12,17 @@ COPY . .
 # Install required librariess
 RUN pip install --upgrade pip
 RUN pip install bleak
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "control_heater.py"]
+# Expose Flask port
+EXPOSE 5000
+
+# Start Flask API
+CMD ["python", "api.py"]
+
+
+
+
+
+
+
