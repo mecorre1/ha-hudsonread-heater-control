@@ -16,7 +16,7 @@ def set_temperature():
 
     return jsonify({"message": f"Temperature set to {temp}°C"}), 200
 
-# Sample endpoint to set mode
+# Sample endpoint to set modes
 @app.route('/set-mode', methods=['POST'])
 def set_mode():
     data = request.json
