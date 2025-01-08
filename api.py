@@ -1,20 +1,47 @@
 from flask import Flask, request, jsonify
+import json
+import asyncio
+from control_heater import set_room_temperature
+
+# Load rooms configuration
+with open("rooms.json", "r") as file:
+    rooms = json.load(file)
 
 app = Flask(__name__)
 
-# Sample endpoint to set temperature
 @app.route('/set-temp', methods=['POST'])
 def set_temperature():
-    data = request.get_json(force=True)
-    temp = data.get('temperature')
+    try:
+        # Extract and validate data
+        data = request.get_json(force=True)
+        room = data.get('room')  # Room name
+        target_temp = float(data.get('temperature'))  # Target temperature
 
-    if not temp or not isinstance(temp, (int, float)):
-        return jsonify({"error": "Invalid temperature value"}), 400
+        # Validate input
+        if room not in rooms:
+            return jsonify({"error": f"Room '{room}' not found"}), 400
 
-    # Logic to set temperature (placeholder)
-    print(f"Setting temperature to {temp}°C")
+        if not (30 <= target_temp <= 60):  # Check heating element range
+            return jsonify({"error": "Temperature out of range (30–60°C)"}), 400
 
-    return jsonify({"message": f"Temperature set to {temp}°C"}), 200
+        # Call function to set temperature
+        asyncio.run(set_room_temperature(room, target_temp, target_type="heater"))
+
+        return jsonify({"status": "success", "room": room, "temperature": target_temp}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+# Get rooms to dynamically populate HA dropdown
+@app.route('/rooms', methods=['GET'])
+def get_rooms():
+    try:
+        room_list = list(rooms.keys())  # Extract room names
+        return jsonify({"rooms": room_list}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # Sample endpoint to set modes
 @app.route('/set-mode', methods=['POST'])
