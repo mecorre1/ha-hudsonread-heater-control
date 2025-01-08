@@ -2,7 +2,7 @@ import json
 import asyncio
 from bleak import BleakClient
 
-# UUIDs for heater characteristicss
+# UUIDs for heater characteristics
 ROOM_TEMP_UUID = "d97352b1-d19e-11e2-9e96-0800200c9a66"
 HEAT_TEMP_UUID = "d97352b2-d19e-11e2-9e96-0800200c9a66"
 MODE_UUID = "d97352b3-d19e-11e2-9e96-0800200c9a66"
