@@ -113,41 +113,67 @@ async def set_room_temperature(room, target_temp, target_type):
         async with BleakClient(heater) as client:
             await set_temperature(client, target_temp, uuid)
 
-# ------------------------------------
-# Main Menu
-# ------------------------------------
+# Function to retrieve all BLE characteristics
+async def get_all_ble_fields(address):
+    async with BleakClient(address) as client:
+        try:
+            # Connect and fetch all characteristics
+            services = await client.get_services()
+            fields = {}
+            
+            for service in services:
+                for characteristic in service.characteristics:
+                    if "read" in characteristic.properties:
+                        try:
+                            # Read the value of the characteristic
+                            value = await client.read_gatt_char(characteristic.uuid)
+                            fields[characteristic.uuid] = {
+                                "value": value.hex(),
+                                "description": characteristic.description,
+                                "service": service.uuid
+                            }
+                        except Exception as e:
+                            fields[characteristic.uuid] = {"error": str(e)}
+            
+            return fields
+        except Exception as e:
+            return {"error": str(e)}
 
-async def main():
-    while True:
-        print("\nOptions:")
-        print("  r - Read room settings")
-        print("  m - Set room mode")
-        print("  t - Set room temperature")
-        print("  q - Quit")
-        action = input("Choose action: ").strip().lower()
+# # ------------------------------------
+# # Main Menu
+# # ------------------------------------
 
-        if action == "r":
-            room = input("Enter room name: ").strip().lower()
-            await read_room_settings(room)
+# async def main():
+#     while True:
+#         print("\nOptions:")
+#         print("  r - Read room settings")
+#         print("  m - Set room mode")
+#         print("  t - Set room temperature")
+#         print("  q - Quit")
+#         action = input("Choose action: ").strip().lower()
 
-        elif action == "m":
-            room = input("Enter room name: ").strip().lower()
-            mode = input("Enter mode (Off, Manual (Room Temp), Manual (Heating Element Temp)): ").strip()
-            await set_room_mode(room, mode)
+#         if action == "r":
+#             room = input("Enter room name: ").strip().lower()
+#             await read_room_settings(room)
 
-        elif action == "t":
-            room = input("Enter room name: ").strip().lower()
-            target_temp = float(input("Enter target temperature (°C): ").strip())
-            target_type = input("Target type? (room/heater): ").strip().lower()
-            await set_room_temperature(room, target_temp, target_type)
+#         elif action == "m":
+#             room = input("Enter room name: ").strip().lower()
+#             mode = input("Enter mode (Off, Manual (Room Temp), Manual (Heating Element Temp)): ").strip()
+#             await set_room_mode(room, mode)
 
-        elif action == "q":
-            break
+#         elif action == "t":
+#             room = input("Enter room name: ").strip().lower()
+#             target_temp = float(input("Enter target temperature (°C): ").strip())
+#             target_type = input("Target type? (room/heater): ").strip().lower()
+#             await set_room_temperature(room, target_temp, target_type)
 
-        else:
-            print("Invalid action. Try again.")
+#         elif action == "q":
+#             break
 
-# ------------------------------------
+#         else:
+#             print("Invalid action. Try again.")
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# # ------------------------------------
+
+# if __name__ == "__main__":
+#     asyncio.run(main())

@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import json
 import asyncio
-from control_heater import set_room_temperature
+import control_heater
 
 # Load rooms configuration
 with open("rooms.json", "r") as file:
@@ -25,7 +25,7 @@ def set_temperature():
             return jsonify({"error": "Temperature out of range (30–60°C)"}), 400
 
         # Call function to set temperature
-        asyncio.run(set_room_temperature(room, target_temp, target_type="heater"))
+        asyncio.run(control_heater.set_room_temperature(room, target_temp, target_type="heater"))
 
         return jsonify({"status": "success", "room": room, "temperature": target_temp}), 200
 
@@ -62,6 +62,25 @@ def set_mode():
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "API is running"}), 200
+
+# Flask route to fetch all BLE fields
+@app.route('/get-all-fields', methods=['GET'])
+def get_all_fields():
+    try:
+        # Extract the BLE address from the request
+        address = request.args.get('address')
+
+        if not address:
+            return jsonify({"error": "The 'address' parameter is required."}), 400
+
+        # Call the BLE function to get all fields
+        import asyncio
+        fields = asyncio.run(control_heater.get_all_ble_fields(address))
+
+        # Return the fields as a response
+        return jsonify({"address": address, "fields": fields})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
