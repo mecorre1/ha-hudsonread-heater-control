@@ -10,14 +10,13 @@ MODE_UUID = "d97352b3-d19e-11e2-9e96-0800200c9a66"
 # Modes Mapping
 MODES = {
     0: "Off",
-    5: "Manual (Room Temp)",
-    6: "Manual (Heating Element Temp)",
-    33: "Manual (Heating Element Temp - Verified)"
+    33: "On - Manual (Heating Element Temp)"
 }
+
+# Mode Encodings
 MODE_ENCODINGS = {
-    "Off": bytes([0x00]),
-    "Manual (Room Temp)": bytes([0x05]),
-    "Manual (Heating Element Temp)": bytes([0x06])
+    "Off": bytes([0x00, 0x00, 0x00, 0x00]),  # Matches "value": "00000000"
+    "On - Manual (Heating Element Temp)": bytes([0x21, 0x00, 0x00, 0x00])  # Matches "value": "21000000"
 }
 
 # Load rooms configuration
