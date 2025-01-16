@@ -63,6 +63,10 @@ async def set_mode(client, mode):
 
 # Helper: Set temperature
 async def set_temperature(client, target_temp, mode_uuid):
+
+    # Ensure the mode is set before writing the temperature
+    await set_mode(client, "On - Manual (Heating Element Temp)")
+
     encoded_temp = b'\x00\x00' + encode_temperature(target_temp)
     await client.write_gatt_char(mode_uuid, encoded_temp)
     print(f"Temperature set to: {target_temp}°C")
