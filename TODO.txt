@@ -1,0 +1,3 @@
+[ ] API for GET room temp and mode. Returns first if multiple heaters
+[ ] Create docker file to easily deploy HA, Cloudflare and Python Heater API
+[ ] Bullet proof access to Raspberry Pi from external

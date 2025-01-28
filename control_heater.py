@@ -9,14 +9,14 @@ MODE_UUID = "d97352b3-d19e-11e2-9e96-0800200c9a66"
 
 # Modes Mapping
 MODES = {
-    0: "Off",
-    33: "On - Manual (Heating Element Temp)"
+    0: "off",
+    33:"on"  # On - Manual (Heating Element Temp)
 }
 
 # Mode Encodings
 MODE_ENCODINGS = {
-    "Off": bytes([0x00, 0x00, 0x00, 0x00]),  # Matches "value": "00000000"
-    "On - Manual (Heating Element Temp)": bytes([0x21, 0x00, 0x00, 0x00])  # Matches "value": "21000000"
+    "off": bytes([0x00, 0x00, 0x00, 0x00]),  # Matches "value": "00000000"
+    "on": bytes([0x21, 0x00, 0x00, 0x00])  # Matches "value": "21000000"
 }
 
 # Load rooms configuration
@@ -75,23 +75,27 @@ async def set_temperature(client, target_temp, mode_uuid):
 # Multi-Heater Actions
 # ------------------------------------
 
-# Read settings for all heaters in a room
+# Read setting of first heater in the room and returns it
 async def read_room_settings(room):
     if room not in rooms:
         print(f"Room '{room}' not found.")
         return
 
-    for heater in rooms[room]:
-        print(f"Connecting to heater: {heater}")
-        async with BleakClient(heater) as client:
-            mode = await read_mode(client)
-            room_temp, heat_temp = await read_temperatures(client)
+    # Get any heater from the room
+    heater = rooms[room]["heaters"][0]  # Select the first heater in the list
+    async with BleakClient(heater) as client:
+        return await read_mode(client)
 
-            print(f"Heater {heater}")
-            print(f"  Mode: {mode}")
-            print(f"  Room Temp - Current: {room_temp[0]}°C, Target: {room_temp[1]}°C")
-            print(f"  Heating Element - Current: {heat_temp[0]}°C, Target: {heat_temp[1]}°C")
-            print()
+# Read temperature of any heater in a room
+async def get_room_temperature(room):
+    if room not in rooms:
+        raise ValueError(f"Room '{room}' not found.")
+
+    # Get the first heater in the room
+    heater = rooms[room]["heaters"][0]
+    async with BleakClient(heater) as client:
+        room_temp, heat_temp = await read_temperatures(client)
+        return {"room_temp": room_temp, "heat_temp": heat_temp}
 
 # Set mode for all heaters in a room
 async def set_room_mode(room, mode):

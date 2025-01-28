@@ -48,13 +48,14 @@ def get_rooms():
 def set_mode():
     data = request.json
     mode = data.get('mode')
+    room = data.get('room')
 
-    valid_modes = ["off", "manual_room", "manual_heating_element"]
+    valid_modes = ["off", "on"]
     if mode not in valid_modes:
         return jsonify({"error": "Invalid mode"}), 400
 
-    # Logic to set mode (placeholder)
-    print(f"Setting mode to {mode}")
+    # Call function to set mode
+    asyncio.run(control_heater.set_room_temperature(room, target_type="heater"))
 
     return jsonify({"message": f"Mode set to {mode}"}), 200
 
@@ -79,6 +80,34 @@ def get_all_fields():
 
         # Return the fields as a response
         return jsonify({"address": address, "fields": fields})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Route to get room mode
+@app.route('/get-room-mode', methods=['GET'])
+def get_room_mode():
+    room = request.args.get("room")
+    if room not in rooms:
+        return jsonify({"error": f"Room '{room}' not found"}), 400
+
+    try:
+        mode = asyncio.run(control_heater.read_mode(room))
+        return jsonify({"room": room, "mode": mode})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Route to get room temperature
+@app.route('/get-room-temperature', methods=['GET'])
+def get_room_temperature_route():
+    room = request.args.get("room")
+    if room not in rooms:
+       return jsonify({"error": f"Room '{room}' not found"}), 400
+
+    try:
+        temperatures = asyncio.run(control_heater.get_room_temperature(room))
+
+        return jsonify({"room": room, "temperatures": temperatures})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
