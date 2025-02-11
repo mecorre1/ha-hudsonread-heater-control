@@ -94,8 +94,9 @@ async def get_room_temperature(room):
     # Get the first heater in the room
     heater = rooms[room]["heaters"][0]
     async with BleakClient(heater) as client:
-        room_temp, heat_temp = await read_temperatures(client)
-        return {"room_temp": room_temp, "heat_temp": heat_temp}
+        # room_temp, heat_temp = await read_temperatures(client)
+        # return {"room_temp": room_temp, "heat_temp": heat_temp}
+        return {"found heater": heater}
 
 # Set mode for all heaters in a room
 async def set_room_mode(room, mode):
