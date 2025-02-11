@@ -78,7 +78,7 @@ async def set_temperature(client, target_temp, mode_uuid):
 # Read settings for all heaters in a room
 async def read_room_settings(room):
     if room not in rooms:
-        print(f"Room '{room}' not found.")
+        print(f"Room '{room}' not found..")
         return
 
     for heater in rooms[room]:
