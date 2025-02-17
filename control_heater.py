@@ -1,6 +1,10 @@
 import json
 import asyncio
+import logging
 from bleak import BleakClient
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # UUIDs for heater characteristics
 ROOM_TEMP_UUID = "d97352b1-d19e-11e2-9e96-0800200c9a66"
@@ -15,26 +19,24 @@ MODES = {
 
 # Mode Encodings
 MODE_ENCODINGS = {
-    "Off": bytes([0x00, 0x00, 0x00, 0x00]),  # Matches "value": "00000000"
-    "On - Manual (Heating Element Temp)": bytes([0x21, 0x00, 0x00, 0x00])  # Matches "value": "21000000"
+    "Off": bytes([0x00, 0x00, 0x00, 0x00]),
+    "On - Manual (Heating Element Temp)": bytes([0x21, 0x00, 0x00, 0x00])
 }
 
 # Load rooms configuration
 with open("rooms.json", "r") as file:
     rooms = json.load(file)
 
-# ------------------------------------
-# Helper Functions
-# ------------------------------------
-
 # Helper: Decode temperature values
 def decode_temperature(data):
+    logging.debug(f"Decoding temperature data: {data}")
     current_temp = ((data[1] << 8) | data[0]) / 10
     target_temp = ((data[3] << 8) | data[2]) / 10
     return round(current_temp, 1), round(target_temp, 1)
 
 # Helper: Encode target temperature
 def encode_temperature(target_temp):
+    logging.debug(f"Encoding target temperature: {target_temp}")
     temp_value = int(target_temp * 10)
     return temp_value.to_bytes(2, 'little')
 
@@ -42,10 +44,12 @@ def encode_temperature(target_temp):
 async def read_mode(client):
     data = await client.read_gatt_char(MODE_UUID)
     mode = int.from_bytes(data, byteorder='little')
+    logging.debug(f"Read mode: {data} (decoded: {mode})")
     return MODES.get(mode, f"Unknown ({mode})")
 
 # Helper: Read temperatures
 async def read_temperatures(client):
+    logging.debug("Reading temperatures...")
     room_temp_data = await client.read_gatt_char(ROOM_TEMP_UUID)
     heat_temp_data = await client.read_gatt_char(HEAT_TEMP_UUID)
 
@@ -55,80 +59,58 @@ async def read_temperatures(client):
 
 # Helper: Set mode
 async def set_mode(client, mode):
+    logging.debug(f"Setting mode to: {mode}")
     if mode in MODE_ENCODINGS:
         await client.write_gatt_char(MODE_UUID, MODE_ENCODINGS[mode])
-        print(f"Mode set to: {mode}")
+        logging.info(f"Mode successfully set to: {mode}")
     else:
-        print("Invalid mode")
+        logging.error("Invalid mode")
 
 # Helper: Set temperature
 async def set_temperature(client, target_temp, mode_uuid):
-
-    # Ensure the mode is set before writing the temperature
+    logging.debug(f"Setting temperature to {target_temp}°C on UUID {mode_uuid}")
     await set_mode(client, "On - Manual (Heating Element Temp)")
-
     encoded_temp = b'\x00\x00' + encode_temperature(target_temp)
     await client.write_gatt_char(mode_uuid, encoded_temp)
-    print(f"Temperature set to: {target_temp}°C")
+    logging.info(f"Temperature successfully set to: {target_temp}°C")
 
-# ------------------------------------
 # Multi-Heater Actions
-# ------------------------------------
-
-# Read settings for all heaters in a room
 async def read_room_settings(room):
     if room not in rooms:
-        print(f"Room '{room}' not found..")
+        logging.error(f"Room '{room}' not found.")
         return
 
     for heater in rooms[room]:
-        print(f"Connecting to heater: {heater}")
+        logging.debug(f"Connecting to heater: {heater}")
         async with BleakClient(heater) as client:
             mode = await read_mode(client)
             room_temp, heat_temp = await read_temperatures(client)
+            logging.info(f"Heater {heater}: Mode={mode}, Room Temp={room_temp}, Heat Temp={heat_temp}")
 
-            print(f"Heater {heater}")
-            print(f"  Mode: {mode}")
-            print(f"  Room Temp - Current: {room_temp[0]}°C, Target: {room_temp[1]}°C")
-            print(f"  Heating Element - Current: {heat_temp[0]}°C, Target: {heat_temp[1]}°C")
-            print()
-
-# Set mode for all heaters in a room
-async def set_room_mode(room, mode):
-    if room not in rooms:
-        print(f"Room '{room}' not found.")
-        return
-
-    for heater in rooms[room]:
-        print(f"Connecting to heater: {heater}")
-        async with BleakClient(heater) as client:
-            await set_mode(client, mode)
-
-# Set temperature for all heaters in a room
 async def set_room_temperature(room, target_temp, target_type):
     if room not in rooms:
-        print(f"Room '{room}' not found.")
+        logging.error(f"Room '{room}' not found.")
         return
 
     uuid = ROOM_TEMP_UUID if target_type == "room" else HEAT_TEMP_UUID
     for heater in rooms[room]:
-        print(f"Connecting to heater: {heater}")
+        logging.debug(f"Connecting to heater: {heater}")
         async with BleakClient(heater) as client:
-            await set_temperature(client, target_temp, uuid)
+            try:
+                await set_temperature(client, target_temp, uuid)
+            except Exception as e:
+                logging.error(f"Error setting temperature for heater {heater}: {e}")
 
-# Function to retrieve all BLE characteristics
 async def get_all_ble_fields(address):
+    logging.debug(f"Fetching all BLE fields for {address}")
     async with BleakClient(address) as client:
         try:
-            # Connect and fetch all characteristics
             services = await client.get_services()
             fields = {}
-            
             for service in services:
                 for characteristic in service.characteristics:
                     if "read" in characteristic.properties:
                         try:
-                            # Read the value of the characteristic
                             value = await client.read_gatt_char(characteristic.uuid)
                             fields[characteristic.uuid] = {
                                 "value": value.hex(),
@@ -137,9 +119,9 @@ async def get_all_ble_fields(address):
                             }
                         except Exception as e:
                             fields[characteristic.uuid] = {"error": str(e)}
-            
             return fields
         except Exception as e:
+            logging.error(f"Error fetching BLE fields: {e}")
             return {"error": str(e)}
 
 # # ------------------------------------
