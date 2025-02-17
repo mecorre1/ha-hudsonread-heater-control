@@ -2,9 +2,12 @@ import json
 import asyncio
 import logging
 from bleak import BleakClient
+import os
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=getattr(logging, log_level, logging.INFO), format='%(asctime)s - %(levelname)s - %(message)s')
+
+logging.debug("Debug logging is enabled!")
 
 # UUIDs for heater characteristics
 ROOM_TEMP_UUID = "d97352b1-d19e-11e2-9e96-0800200c9a66"
